@@ -1,0 +1,75 @@
+// KuwaharaFilter.osl by DizzyQuarkArt
+// This file is licensed under Apache 2.0 license
+
+shader kuwahara_filter(
+    string fileName = "" [[string widget="filename", string page = "Image" ]],
+    string fileColorSpace = "" [[string label = "Colorspace", string page = "Color Space Conversion", string widget = "colorspace"]],
+
+    float Radius = 0.003,
+    output color Output = color(0.0))
+
+{
+    int radSteps = int(Radius * 1000); // Convert radius to integer steps
+    if (radSteps < 1)
+        radSteps = 1;
+
+    color mean[4] = {color(0), color(0), color(0), color(0)};
+    float variance[4] = {0.0, 0.0, 0.0, 0.0};
+
+    // Offset directions for the four neighborhoods
+    int offset_x[4] = {-1, 1, -1, 1};
+    int offset_y[4] = {-1, -1, 1, 1};
+
+    // Get the base UV coordinates
+    vector uv = vector(u, -v, 0);
+
+    // Loop through the four neighborhoods
+    for (int n = 0; n < 4; n++) {
+        color sum = color(0.0);
+        float sum_sq = 0.0;
+        int count = 0;
+
+        // Sample the neighborhood
+        for (int x = 0; x <= radSteps; x++) {
+            for (int y = 0; y <= radSteps; y++) {
+                // Compute texture coordinates with offsets
+                float u_offset = offset_x[n] * x * Radius;
+                float v_offset = offset_y[n] * y * Radius;
+                float u_new = uv[0] + u_offset;
+                float v_new = uv[1] + v_offset;
+
+                // Wrap UV coordinates to stay within 0 to 1
+                u_new = u_new - floor(u_new);
+                v_new = v_new - floor(v_new);
+
+                // Sample texture at offset
+                color sample = texture(fileName, u_new, v_new);
+                sum += sample;
+                sum_sq += dot(sample, sample);
+                count++;
+            }
+        }
+
+        // Calculate mean and variance for the neighborhood
+        mean[n] = sum / count;
+        variance[n] = (sum_sq / count) - dot(mean[n], mean[n]);
+    }
+
+    // Find the neighborhood with the minimum variance
+    int min_index = 0;
+    float min_variance = variance[0];
+    for (int i = 1; i < 4; i++) {
+        if (variance[i] < min_variance) {
+            min_variance = variance[i];
+            min_index = i;
+        }
+    }
+
+    // Set the output color to the mean of the selected neighborhood
+    color output_mean = mean[min_index];
+
+    color textureSampleRAW = transformc("ACEScg", "scene-linear Rec.709-sRGB", output_mean);
+    color outColor = transformc(fileColorSpace, "ACEScg", textureSampleRAW);
+
+    Output = outColor;
+}
