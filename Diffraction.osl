@@ -130,7 +130,7 @@ shader Diffraction
         string page = "Coat",
         float min = 0, float max = 1
         ]],
-    float coat_IOR = 1.52
+    float coat_IOR = 1.33
         [[
         string label = "Coat IOR" ,
         string page = "Coat",
@@ -160,6 +160,10 @@ shader Diffraction
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
 
+    float base_ior = mix(IOR, IOR / coat_IOR, coat_weight);
+    base_ior = select(1 / base_ior, base_ior, int(base_ior));
+    float base_roughness = mix(microfacet_roughness, pow(min(1, pow(microfacet_roughness,4) + 2*pow(coat_roughness, 4)), 0.25), coat_weight);
+
     for(int m = -diffraction_orders; m <= diffraction_orders; m++){
         color Ct = color(1);
         normal Nw = Normal;
@@ -177,16 +181,26 @@ shader Diffraction
             intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
         }
 
-        metal += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, 0, 0);
-        refl += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 0);
-        refr += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 1);
+        metal += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, 0, 0);
+        refl += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, base_ior, 0);
+        refr += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, base_ior, 1);
     }
 
-    color coat_contribution = mix(color(1.0), coat_color, coat_weight);
+    color weighted_coat_color = mix(color(1.0), coat_color, coat_weight);
 
-    BRDF = coat_contribution * mix(refl, refr, refraction_weight);
+    float Kr = 0;
+    float Kt = 0;
+    vector R = vector(0);
+    vector T = vector(0);
+
+    fresnel(I, N, 1 / base_ior, Kr, Kt, R, T);
+
+    refr *= mix(1, Kt, coat_weight);
+    refl *= mix(1, Kt, coat_weight);
+
+    BRDF = weighted_coat_color * mix(refl, refr, refraction_weight);
 
     // Add diffuse and clearcoat
-    BRDF += coat_contribution * mix(base_color * base_weight * mix(oren_nayar(N, base_rough), metal, base_metal), zero, refraction_weight);
-    BRDF += coat_weight * microfacet("ggx", N, coat_roughness, coat_IOR, 0);
+    BRDF += weighted_coat_color * mix(base_color * base_weight * mix(oren_nayar(N, base_rough), metal, base_metal), zero, refraction_weight);
+    BRDF += coat_weight * microfacet("ggx", N, 0.005, coat_IOR, 0);
 }
