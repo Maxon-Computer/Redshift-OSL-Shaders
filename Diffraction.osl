@@ -7,17 +7,39 @@ float sineSolver(vector NN) {
     return sqrt(1.0 - cosine * cosine);
 }
 
-float wavelength(float w_min, float w_max, int order, int strata) {
-    float range = w_max - w_min;
-    float v = noise("hash", P, time + order * 12.345); // another independent noise value
-    int bin = int(v * strata);
-    float binSize = range / strata;
-    float jitter = noise("hash", P, time + order * 67.890); // a small jitter within the bin
-    return w_min + bin * binSize + jitter * binSize;
-}
-
-shader Diffraction
+shader Diffraction3
 (
+    color diffuse_color = 0.5
+        [[
+        string label = "Color",
+        string page = "Diffuse",
+        ]],
+    float diffuse_weight = 1.0
+        [[
+        string label = "Weight",
+        string page = "Diffuse",
+        float min = 0,
+        float max = 1
+        ]],
+    float diffuse_rough = 0.0
+        [[
+        string label = "Roughness",
+        string page = "Diffuse",
+        float min = 0,
+        float max = 1
+        ]],
+    color diffraction_color = 1.0
+        [[
+        string label = "Color",
+        string page = "Diffraction"
+        ]],
+    float diffraction_weight = 1.0
+        [[
+        string label = "Weight",
+        string page = "Diffraction",
+        float min = 0,
+        float max = 1
+        ]],
     int diffraction_orders = 6
         [[
         string label = "Orders",
@@ -32,7 +54,7 @@ shader Diffraction
         float min = 0,
         float max = 1
         ]],
-    float grating_distance = 800
+    float Distance = 800
         [[
         string label = "Distance",
         string page = "Diffraction",
@@ -46,12 +68,52 @@ shader Diffraction
         float min = 0.01,
         float max = 1
         ]],
+    float diffraction_roughness = 0.05
+        [[
+        string label = "Roughness",
+        string page = "Diffraction",
+        float min = 0,
+        float max = 1
+        ]],
+    float IOR=1.52
+        [[
+        string label = "IOR",
+        string page = "Diffraction",
+        float slidermin = 0,
+        float slidermax = 5,
+        float min = 0,
+        float max = 50
+        ]],
     float rotation = 0.0
         [[
         string label = "Rotation",
         string page = "Diffraction",
         float min = 0,
         float max = 1
+        ]],
+    color coat_color = color(1.0)
+        [[
+        string label = "Coat Color",
+        string page = "Coat",
+        ]],
+    float coat_weight = 0.0
+        [[
+        string label = "Coat Weight" ,
+        string page = "Coat",
+        float min = 0, float max = 1
+        ]],
+    float coat_roughness = 0.005
+        [[
+        string label = "Coat Roughness" ,
+        string page = "Coat",
+        float min = 0, float max = 1
+        ]],
+    float coat_IOR = 1.52
+        [[
+        string label = "Coat IOR" ,
+        string page = "Coat",
+        float slidermin = 0, float slidermax = 5,
+        float min = 0, float max = 50
         ]],
     normal Normal = N
         [[
@@ -63,41 +125,36 @@ shader Diffraction
         string label = "Tangent",
         string page = "Extra"
         ]],
-    output normal DiffractionNormal = N,
-    output color DiffractionColor = color(1)
+
+    output closure color BRDF = 0
 )
 
 {
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
 
-    int num_orders = 2 * diffraction_orders + 1;
-    int m = int(floor(noise("hash", P, time) * num_orders)) - diffraction_orders;
-
-    normal Nw = Normal;
-    float intensity = 1;
-    color Ct = color(1);
-
-    if(m != 0){
-        Ct = color(0);
-        for (int bin = 0; bin < 3; bin++){
-            float range = 500;
-            float binSize = range / 3;
-            float jitter = noise("hash", P, time + m + bin); // a small jitter within the bin
-            float w = 300 + bin * binSize + jitter * binSize;
-            Ct += wavelength_color(w);
-
+    for(int m = -diffraction_orders; m <= diffraction_orders; m++){
+        color Ct = color(1);
+        normal Nw = Normal;
+        float rnd = noise("hash", P, time + m);
+        float w = mix(300, 800, rnd);
+        float intensity = 1.0;
+        if(m != 0){
             float sine = sineSolver(Normal);
-            float sine_offset = sine + m * w / grating_distance;
-            if(abs(sine_offset) <= 1){
-                float beta = (M_PI * grating_distance * grating_width * sine) / w;
-                Nw = rotate(Normal, (asin(sine_offset) - asin(sine)), Tg);
-                //Reduce intensity of higher orders based on width of slits and falloff
-                intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
-            }
+            float sine_offset = sine + m * w / Distance;
+            if(abs(sine_offset) > 1) continue;
+            float beta = (M_PI * Distance * grating_width * sine) / w;
+            // Nw = rotate(Normal, asin(sine_offset) - asin(sine), Tg);
+            Nw = rotate(Normal, 0.5 * (asin(sine_offset) - asin(sine)), Tg);
+            Ct = wavelength_color(w) * diffraction_color * diffraction_weight;
+            //Reduce intensity of higher orders based on width of slits and falloff
+            intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
         }
+
+        BRDF += (intensity * Ct) * microfacet("ggx", Nw, diffraction_roughness, IOR, 0);
     }
 
-    DiffractionNormal = Nw;
-    DiffractionColor = intensity * Ct;
+    // Add diffuse and clearcoat
+    BRDF += diffuse_color * diffuse_weight * oren_nayar(N, diffuse_rough);
+    BRDF += coat_color * coat_weight * microfacet("ggx", N, coat_roughness, coat_IOR, 0);
 }
