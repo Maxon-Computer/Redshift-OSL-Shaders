@@ -57,7 +57,7 @@ shader Diffraction
         float min = 0,
         float max = 1
         ]],
-    float IOR=1.52
+    float IOR=1.6
         [[
         string label = "IOR",
         string page = "Microfacet",
@@ -92,7 +92,7 @@ shader Diffraction
         float min = 0,
         float max = 1
         ]],
-    float Distance = 800
+    float Distance = 1200
         [[
         string label = "Distance",
         string page = "Diffraction",
@@ -183,7 +183,7 @@ shader Diffraction
 
         metal += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, 0, 0);
         refl += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, base_ior, 0);
-        refr += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, base_ior, 1);
+        refr += (intensity * Ct) * microfacet("beckmann", Nw, base_roughness, base_ior, 1);
     }
 
     color weighted_coat_color = mix(color(1.0), coat_color, coat_weight);
@@ -198,9 +198,11 @@ shader Diffraction
     refr *= mix(1, Kt, coat_weight);
     refl *= mix(1, Kt, coat_weight);
 
-    BRDF = weighted_coat_color * mix(refl, refr, refraction_weight);
+    float mod_refraction_weight = mix(refraction_weight, 0, base_metal);
+
+    BRDF = weighted_coat_color * mix(refl, refl + refr, mod_refraction_weight);
 
     // Add diffuse and clearcoat
-    BRDF += weighted_coat_color * mix(base_color * base_weight * mix(oren_nayar(N, base_rough), metal, base_metal), zero, refraction_weight);
+    BRDF += weighted_coat_color * mix(base_color * base_weight * mix(oren_nayar(N, base_rough), metal, base_metal), zero, mod_refraction_weight);
     BRDF += coat_weight * microfacet("ggx", N, 0.005, coat_IOR, 0);
 }
