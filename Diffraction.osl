@@ -7,26 +7,64 @@ float sineSolver(vector NN) {
     return sqrt(1.0 - cosine * cosine);
 }
 
+float wavelength_stratified(float w_min, float w_max, int order, int strata) {
+    float range = w_max - w_min;
+    float index = floor(noise("hash", P, time + order * 1.524) * strata);
+    float width = range / strata;
+    float rnd = noise("hash", P, time + order + index);
+    return w_min + width * (index + rnd);
+}
+
 shader Diffraction3
 (
-    color diffuse_color = 0.5
+    color base_color = 0.5
         [[
         string label = "Color",
-        string page = "Diffuse",
+        string page = "Base",
         ]],
-    float diffuse_weight = 1.0
+    float base_weight = 1.0
         [[
         string label = "Weight",
-        string page = "Diffuse",
+        string page = "Base",
         float min = 0,
         float max = 1
         ]],
-    float diffuse_rough = 0.0
+    float base_rough = 0.0
         [[
         string label = "Roughness",
-        string page = "Diffuse",
+        string page = "Base",
         float min = 0,
         float max = 1
+        ]],
+    float base_metal = 0.0
+        [[
+        string label = "Metalness",
+        string page = "Base",
+        float min = 0,
+        float max = 1
+        ]],
+    float refraction_weight = 0.0
+        [[
+        string label = "Refraction",
+        string page = "Microfacet",
+        float min = 0,
+        float max = 1
+        ]],
+    float microfacet_roughness = 0.05
+        [[
+        string label = "Roughness",
+        string page = "Microfacet",
+        float min = 0,
+        float max = 1
+        ]],
+    float IOR=1.52
+        [[
+        string label = "IOR",
+        string page = "Microfacet",
+        float slidermin = 0,
+        float slidermax = 5,
+        float min = 0,
+        float max = 50
         ]],
     color diffraction_color = 1.0
         [[
@@ -67,22 +105,6 @@ shader Diffraction3
         string page = "Diffraction",
         float min = 0.01,
         float max = 1
-        ]],
-    float diffraction_roughness = 0.05
-        [[
-        string label = "Roughness",
-        string page = "Diffraction",
-        float min = 0,
-        float max = 1
-        ]],
-    float IOR=1.52
-        [[
-        string label = "IOR",
-        string page = "Diffraction",
-        float slidermin = 0,
-        float slidermax = 5,
-        float min = 0,
-        float max = 50
         ]],
     float rotation = 0.0
         [[
@@ -130,31 +152,38 @@ shader Diffraction3
 )
 
 {
+    closure color refl = 0;
+    closure color refr = 0;
+    closure color metal = 0;
+
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
 
     for(int m = -diffraction_orders; m <= diffraction_orders; m++){
         color Ct = color(1);
         normal Nw = Normal;
-        float rnd = noise("hash", P, time + m);
-        float w = mix(300, 800, rnd);
+        // float rnd = noise("hash", P, time + m);
+        float w = wavelength_stratified(300, 800, m, 5);
         float intensity = 1.0;
         if(m != 0){
             float sine = sineSolver(Normal);
             float sine_offset = sine + m * w / Distance;
             if(abs(sine_offset) > 1) continue;
             float beta = (M_PI * Distance * grating_width * sine) / w;
-            // Nw = rotate(Normal, asin(sine_offset) - asin(sine), Tg);
             Nw = rotate(Normal, 0.5 * (asin(sine_offset) - asin(sine)), Tg);
             Ct = wavelength_color(w) * diffraction_color * diffraction_weight;
             //Reduce intensity of higher orders based on width of slits and falloff
             intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
         }
 
-        BRDF += (intensity * Ct) * microfacet("ggx", Nw, diffraction_roughness, IOR, 0);
+        metal += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, 0, 0); 
+        refl += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 0);
+        refr += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 1);
     }
 
+    BRDF = mix(refl, refr, refraction_weight);
+
     // Add diffuse and clearcoat
-    BRDF += diffuse_color * diffuse_weight * oren_nayar(N, diffuse_rough);
+    BRDF += mix(base_color * base_weight * mix(oren_nayar(N, base_rough), metal, base_metal), 0, refraction_weight);
     BRDF += coat_color * coat_weight * microfacet("ggx", N, coat_roughness, coat_IOR, 0);
 }
