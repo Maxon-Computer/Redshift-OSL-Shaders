@@ -87,13 +87,13 @@ shader Diffraction
             float w = 300 + bin * binSize + jitter * binSize;
             Ct += wavelength_color(w);
 
-        float sine = sineSolver(Normal);
-        float sine_offset = sine + m * w / grating_distance;
-        if(abs(sine_offset) <= 1){
-            float beta = (M_PI * grating_distance * grating_width * sine) / w;
-            Nw = rotate(Normal, (asin(sine_offset) - asin(sine)), Tg);
-            //Reduce intensity of higher orders based on width of slits and falloff
-            intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
+            float sine = sineSolver(Normal);
+            float sine_offset = sine + m * w / grating_distance;
+            if(abs(sine_offset) <= 1){
+                float beta = (M_PI * grating_distance * grating_width * sine) / w;
+                Nw = rotate(Normal, (asin(sine_offset) - asin(sine)), Tg);
+                //Reduce intensity of higher orders based on width of slits and falloff
+                intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
             }
         }
     }
