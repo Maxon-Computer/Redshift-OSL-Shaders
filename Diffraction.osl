@@ -76,7 +76,17 @@ shader Diffraction
 
     normal Nw = Normal;
     float intensity = 1;
+    color Ct = color(1);
+
     if(m != 0){
+        Ct = color(0);
+        for (int bin = 0; bin < 3; bin++){
+            float range = 500;
+            float binSize = range / 3;
+            float jitter = noise("hash", P, time + m + bin); // a small jitter within the bin
+            float w = 300 + bin * binSize + jitter * binSize;
+            Ct += wavelength_color(w);
+
         float sine = sineSolver(Normal);
         float sine_offset = sine + m * w / grating_distance;
         if(abs(sine_offset) <= 1){
@@ -84,10 +94,10 @@ shader Diffraction
             Nw = rotate(Normal, (asin(sine_offset) - asin(sine)), Tg);
             //Reduce intensity of higher orders based on width of slits and falloff
             intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
+            }
         }
     }
 
     DiffractionNormal = Nw;
-    DiffractionColor = (2 * diffraction_orders + 1) * intensity * Ct;
+    DiffractionColor = intensity * Ct;
 }
-
