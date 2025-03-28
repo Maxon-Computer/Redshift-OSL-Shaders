@@ -1,0 +1,65 @@
+normal random_spherical_alt(float seed){
+    point sphere_pos = point(2 * noise("hash", P, seed) - 1);
+    float i = 1;
+    while(length(sphere_pos) > 1){
+        sphere_pos = point(2 * noise("hash", P, seed + i) - 1);
+        i += 1;
+    };
+    return sphere_pos;
+}
+
+normal random_spherical(float seed){
+    vector rand = noise("hash", P, seed);
+
+    float u = rand.x;
+    float v = rand.y;
+
+    float theta = 2.0 * M_PI * u;
+    float phi = acos(2.0 * v - 1.0);
+
+    float x = sin(phi) * cos(theta);
+    float y = sin(phi) * sin(theta);
+    float z = cos(phi);
+
+    return vector(x, y, z);
+}
+
+void probe_distance(float seed, float max_distance, output float min_distance, output normal min_ray_dir, output normal min_normal){
+    // Generate a random direction within the hemisphere
+    vector dir = normalize(random_spherical(seed));
+    
+    // Initialize the hit distance for the current ray
+    float hit_distance = max_distance;
+    
+    // Perform the trace call
+    if (trace(P, dir, "maxdist", max_distance)) {
+        getmessage("trace", "hitdist", hit_distance);
+        // If we hit something and the hit distance is less than the current minimum
+        if (hit_distance < min_distance) {
+            getmessage("trace", "Ng", min_normal);
+            min_distance = hit_distance;
+            min_ray_dir = dir;
+        }
+    }
+}
+
+shader Distance(
+    int seed = 12345,
+    float max_distance = 100,
+    output float Distance=0,
+    output normal Direction=0,
+    output normal Normal=0
+)
+{
+    // Initialize the minimum hit distance to a large value
+    float min_distance = max_distance;
+    normal min_normal;
+    normal min_ray_dir;
+    int i = seed;
+    for(int i = 0; i <= samples; i++){
+        probe_distance(i, max_distance, min_distance, min_ray_dir, min_normal);
+    }
+    Distance = min_distance;
+    Direction = min_ray_dir;
+    Normal = min_normal;
+}

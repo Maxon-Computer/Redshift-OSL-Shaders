@@ -1,0 +1,101 @@
+/*
+ * Diffraction Grating
+ */
+
+float sineSolver(vector NN) {
+    float cosine = dot(I, NN);
+    return sqrt(1.0 - cosine * cosine);
+}
+
+float wavelength(float w_min, float w_max, int order, int strata) {
+    float range = w_max - w_min;
+    float v = noise("hash", P, time + order * 12.345); // another independent noise value
+    int bin = int(v * strata);
+    float binSize = range / strata;
+    float jitter = noise("hash", P, time + order * 67.890); // a small jitter within the bin
+    return w_min + bin * binSize + jitter * binSize;
+}
+
+shader Diffraction
+(
+    int diffraction_orders = 6
+        [[
+        string label = "Orders",
+        string page = "Diffraction",
+        int min = 1,
+        int max = 12
+        ]],
+    float diffraction_falloff = 0.0
+        [[
+        string label = "Falloff",
+        string page = "Diffraction",
+        float min = 0,
+        float max = 1
+        ]],
+    float grating_distance = 800
+        [[
+        string label = "Distance",
+        string page = "Diffraction",
+        float min = 200,
+        float max = 8000
+        ]],
+    float grating_width = 0.1
+        [[
+        string label = "Fill Ratio",
+        string page = "Diffraction",
+        float min = 0.01,
+        float max = 1
+        ]],
+    float rotation = 0.0
+        [[
+        string label = "Rotation",
+        string page = "Diffraction",
+        float min = 0,
+        float max = 1
+        ]],
+    normal Normal = N
+        [[
+        string label = "Normal",
+        string page = "Extra"
+        ]],
+    normal Tangent = normalize(dPdu)
+        [[
+        string label = "Tangent",
+        string page = "Extra"
+        ]],
+    output normal DiffractionNormal = N,
+    output color DiffractionColor = color(1)
+)
+
+{
+    // Change the angle of the diffraction grating
+    normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
+
+    int m = round((2.0 * float(noise("hash", P, time)) - 1.0) * diffraction_orders);
+
+    float w = wavelength(300, 800, m, 10);
+    color Ct = select(color(1), wavelength_color(w), m);
+
+    /*
+    float rnd = noise("hash", P, time + m);
+    float w = mix(300, 800, rnd);
+    color Ct = select(color(1), wavelength_color(w), m);
+    */
+
+    normal Nw = Normal;
+    float intensity = 1;
+    if(m != 0){
+        float sine = sineSolver(Normal);
+        float sine_offset = sine + m * w / grating_distance;
+        if(abs(sine_offset) <= 1){
+            float beta = (M_PI * grating_distance * grating_width * sine) / w;
+            Nw = rotate(Normal, (asin(sine_offset) - asin(sine)), Tg);
+            //Reduce intensity of higher orders based on width of slits and falloff
+            intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
+        }
+    }
+
+    DiffractionNormal = Nw;
+    DiffractionColor = (2 * diffraction_orders + 1) * intensity * Ct;
+}
+

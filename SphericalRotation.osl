@@ -1,0 +1,33 @@
+// Spherical Rotation Shader - generates a spherical rotation offset for procedural 3D shaders
+/*
+   Copyright 2024 Edward Darby Edelen
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+shader SphericalRotation(
+    float rotation_amount = 0
+    [[string label = "Rotation Amount", string page="Transform", float slidermin = 0, float slidermax = 360]],
+    vector rotation_axis = vector(0,1,0)
+    [[string label = "Rotation Axis"]],
+    output point Rotated_Offset = point(0,0,0),
+    output point Rotated_Position = P,
+)
+{
+    point source_position = transform("object", P);
+
+    point result = rotate(source_position, radians(rotation_amount), rotation_axis);
+
+    Rotated_Offset = normal(result - source_position);
+    Rotated_Position = result;
+}
