@@ -71,16 +71,8 @@ shader Diffraction
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
 
-    int m = round((2.0 * float(noise("hash", P, time)) - 1.0) * diffraction_orders);
-
-    float w = wavelength(300, 800, m, 10);
-    color Ct = select(color(1), wavelength_color(w), m);
-
-    /*
-    float rnd = noise("hash", P, time + m);
-    float w = mix(300, 800, rnd);
-    color Ct = select(color(1), wavelength_color(w), m);
-    */
+    int num_orders = 2 * diffraction_orders + 1;
+    int m = int(floor(noise("hash", P, time) * num_orders)) - diffraction_orders;
 
     normal Nw = Normal;
     float intensity = 1;
