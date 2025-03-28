@@ -15,7 +15,7 @@ float wavelength_stratified(float w_min, float w_max, int order, int strata) {
     return w_min + width * (index + rnd);
 }
 
-shader Diffraction3
+shader Diffraction
 (
     color base_color = 0.5
         [[
@@ -177,7 +177,7 @@ shader Diffraction3
             intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
         }
 
-        metal += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, 0, 0); 
+        metal += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, 0, 0);
         refl += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 0);
         refr += (intensity * Ct) * microfacet("ggx", Nw, microfacet_roughness, IOR, 1);
     }
