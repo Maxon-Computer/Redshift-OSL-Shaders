@@ -1,6 +1,7 @@
 // Author: Adrian Cruceru
 // simple texture node with extra controls
 // © Adrian Cruceru 2021
+// This file is licensed under Apache 2.0 license
 
 shader oslTexture
 [[  string label = "Uber Texture" ]]
@@ -11,17 +12,8 @@ shader oslTexture
 
     // Color Spaces
     // might not be needed as the filename widget has this internally
-    int changeSpace = 0
-    [[	string label = "Replace Color Space",
-    	string page = "Color Space Conversion",
-    	string widget = "checkBox"]],
-   string fromSpace = "" 
-    [[  string label = "Input Space", string page = "Color Space Conversion", string widget = "colorspace"]],
-    string toSpace = "" 
-    [[  string label = "Output Space", string page = "Color Space Conversion", string widget = "colorspace"]],
-    int swapInputs = 0
-    [[  string label = "Swap Spaces", string page = "Color Space Conversion", string widget = "checkBox"]],
-    
+   string fileColorSpace = "" 
+    [[  string label = "Colorspace", string page = "Color Space Conversion", string widget = "colorspace"]],
     // UVs
     string  uTiling = "default"
     [[  string widget = "popup",
@@ -153,12 +145,12 @@ shader oslTexture
     float rotV = r[1];
 
     // offset
-	float uTranslate = (rotU - uOffset);
-    float vTranslate = (rotV - vOffset);
+	float uTranslate = (rotU - -uOffset);
+    float vTranslate = (rotV - -vOffset);
 
 	// repeats and scale
-	float uCoord = clamp(mod(uTranslate * uRepeats / scale, 1), 0, 1);
-	float vCoord = clamp(mod(vTranslate * vRepeats / scale, 1), 0, 1);
+	float uCoord = clamp(mod(uTranslate * uRepeats / (1.0/scale), 1), 0, 1);
+	float vCoord = clamp(mod(vTranslate * vRepeats / (1.0/scale), 1), 0, 1);
 
     // texture
     color outTexture = texture( fileName, uCoord, -vCoord, "swrap", uTiling, "twrap", vTiling);
@@ -175,13 +167,8 @@ shader oslTexture
     outTexture *= pow(2,exposure);
 
     // color space change
-	if (changeSpace == 1) {
-	    color out = transformc(fromSpace, toSpace, outTexture);
-	    color inverted = transformc(toSpace, fromSpace, outTexture);
-	    outColor = mix(out, inverted, swapInputs);
-	}
-	else
-	outColor = outTexture;
+	color textureSampleRAW = transformc("ACEScg", "scene-linear Rec.709-sRGB", outTexture);
+    outColor = transformc(fileColorSpace, "ACEScg", textureSampleRAW);
 
 	// string output
 	tex0 = fileName;

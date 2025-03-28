@@ -21,6 +21,8 @@ The Shift_Odd value shifts the odd rows to get a brick pattern.
 Independent width and height controls to compansate for non square tiles.
 
 Hook up a Texture Node to use a texture for the grout color instead of a solid color.
+
+This file is licensed under Apache 2.0 license
 */
 
 float variation_mix(float base, float variation, float mixvalue)
