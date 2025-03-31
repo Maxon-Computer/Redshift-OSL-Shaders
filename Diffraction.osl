@@ -62,11 +62,12 @@ shader DiffractionGrating
         float min = 0,
         float max = 1
         ]],
-    int microfacet_enable = 1
+    float microfacet_weight = 1
         [[
-        string label = "Include Zero Order",
+        string label = "Weight",
         string page = "Microfacet",
-        string widget = "checkBox"
+        float min = 0,
+        float max = 1
         ]],
     float refraction_weight = 0.0
         [[
@@ -210,7 +211,7 @@ shader DiffractionGrating
     closure color metal = 0;
     closure color zero = 0;
 
-    float epsilon = 0.0000001;
+    float epsilon = 0.000001;
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
     normal Ta = rotate(Tangent, (rotation + microfacet_rotation)*M_2PI, Normal);
@@ -247,12 +248,12 @@ shader DiffractionGrating
             refl += (intensity * Ct) * microfacet("ggx", Nw, roughness.y * pow(1 - diffraction_roughness_falloff, (abs(m) - 1)), base_ior, 0);
             refr += (intensity * Ct) * microfacet("beckmann", Nw, roughness.y * pow(1 - diffraction_roughness_falloff, (abs(m) - 1)), base_ior, 1);
         }
-        else if(microfacet_enable){
+        else{
             float alpha_x = mix(2 * roughness.x, 0, 0.5 * (clamp(microfacet_anisotropy, epsilon - 1, 1 - epsilon) + 1));
             float alpha_y = mix(0, 2 * roughness.x, 0.5 * (clamp(microfacet_anisotropy, epsilon - 1, 1 - epsilon) + 1));
-            metal += (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, 0, 0);
-            refl += (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, base_ior, 0);
-            refr += (intensity * Ct) * microfacet("beckmann", Nw, Ta, alpha_x, alpha_y, base_ior, 1);
+            metal += mix(zero, (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, 0, 0), microfacet_weight);
+            refl += mix(zero, (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, base_ior, 0), microfacet_weight);
+            refr += mix(zero, (intensity * Ct) * microfacet("beckmann", Nw, Ta, alpha_x, alpha_y, base_ior, 1), microfacet_weight);
         }
     }
 
