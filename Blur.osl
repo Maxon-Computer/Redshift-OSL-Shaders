@@ -34,6 +34,15 @@ vector exponentialFromUniform(vector vec_in){
     return vector(r * u2_cos, r * u2_sin, 0);
 }
 
+vector lorentzianFromUniform(vector vec_in){
+    float u2_sin;
+    float u2_cos;
+
+    float r = tan(M_PI * (vec_in.x - 0.5));
+    sincos(M_2PI * vec_in.y, u2_sin, u2_cos);
+    return vector(r * u2_cos, r * u2_sin, 0);
+}
+
 vector gaussianFromUniform(vector vec_in){
     float u2_sin;
     float u2_cos;
@@ -47,12 +56,13 @@ vector samplePoints(vector vec_in, float power, int mode){
     if(mode==0) return gaussianFromUniform(vec_in);
     if(mode==1) return powerFromUniform(vec_in, power);
     if(mode==2) return exponentialFromUniform(vec_in);
+    if(mode==3) return lorentzianFromUniform(vec_in);
 }
 
 shader Blur(
     float strength = 10 [[string label="Strength", string page="Blur", string widget="number", int slider=1, float slidermin = 0, float slidermax=100, float min=0, float max=1000000000, float sensitivity = 0.1]],
     int space_select = 0 [[string label="Space", string page="Blur", string widget="mapper", string options="UV:0|Object:1|World:2"]],
-    int kernel_select = 0 [[string label="Blur", string page="Blur", string widget="mapper", string options="Gaussian:0|Power:1|Exponential:2"]],
+    int kernel_select = 0 [[string label="Blur", string page="Blur", string widget="mapper", string options="Gaussian:0|Power:1|Exponential:2|Lorentzian:3"]],
     float power = 1 [[string label="Power", string page="Blur", int slider=1, float min = -10000.0, float max = 10000.0, float slidermin = 0.0, float slidermax = 10.0]],
     int dir_mode = 0 [[string label="Direction Mode", string page="Blur",
                     string widget="mapper", string options="Anisotropy:0|Vector Blur:1", int connectable=0]],
