@@ -60,6 +60,12 @@ A collection of [Open Shading Language (OSL)](https://github.com/AcademySoftware
 
 - [DegreesToRadians.osl 📝](DegreesToRadians.osl)
 
+### Diffraction
+
+![](Diffraction.jpg)
+
+- [Diffraction.osl 📝](Diffraction.osl)
+
 ### Diffraction Grating
 
 ![](DiffractionGrating.jpg)
