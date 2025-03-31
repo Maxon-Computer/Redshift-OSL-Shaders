@@ -210,33 +210,50 @@ shader DiffractionGrating
     closure color metal = 0;
     closure color zero = 0;
 
+    float epsilon = 0.0000001;
     // Change the angle of the diffraction grating
     normal Tg = rotate(Tangent, rotation*M_2PI, Normal);
+    normal Ta = rotate(Tangent, (rotation + microfacet_rotation)*M_2PI, Normal);
 
     float base_ior = mix(IOR, IOR / coat_IOR, coat_weight);
     base_ior = select(1 / base_ior, base_ior, int(base_ior));
-    float base_roughness = mix(microfacet_roughness, pow(min(1, pow(microfacet_roughness,4) + 2*pow(coat_roughness, 4)), 0.25), coat_weight);
+    float mr = pow(microfacet_roughness, 2);
+    float cr = pow(coat_roughness, 2);
+    float dr = pow(clamp(microfacet_roughness + diffraction_extra_roughness, 0, 1), 2);
+    float base_roughness = mix(mr, pow(min(1, pow(mr,4) + 2*pow(cr, 4)), 0.25), coat_weight);
+
+    vector roughness = vector(base_roughness, dr, 0);
 
     for(int m = -diffraction_orders; m <= diffraction_orders; m++){
         color Ct = color(1);
         normal Nw = Normal;
-        // float rnd = noise("hash", P, time + m);
         float w = wavelength_stratified(300, 800, m, 5);
         float intensity = 1.0;
+        
+        // Calculate diffraction
         if(m != 0){
-            float sine = sineSolver(Normal);
+            float sine = normal_sine(Normal);
             float sine_offset = sine + m * w / Distance;
+
+            // No real solution, continue to next order
             if(abs(sine_offset) > 1) continue;
             float beta = (M_PI * Distance * grating_width * sine) / w;
             Nw = rotate(Normal, 0.5 * (asin(sine_offset) - asin(sine)), Tg);
             Ct = wavelength_color(w) * diffraction_color * diffraction_weight;
-            //Reduce intensity of higher orders based on width of slits and falloff
-            intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1.0 - diffraction_falloff, abs(m));
-        }
+            // Reduce intensity of higher orders based on width of slits and falloff
+            intensity = select(1.0, pow(sin(beta)/beta, 2), beta) * pow(1 - diffraction_falloff, (abs(m) - 1));
 
-        metal += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, 0, 0);
-        refl += (intensity * Ct) * microfacet("ggx", Nw, base_roughness, base_ior, 0);
-        refr += (intensity * Ct) * microfacet("beckmann", Nw, base_roughness, base_ior, 1);
+            metal += (intensity * Ct) * microfacet("ggx", Nw, roughness.y * pow(1 - diffraction_roughness_falloff, (abs(m) - 1)), 0, 0);
+            refl += (intensity * Ct) * microfacet("ggx", Nw, roughness.y * pow(1 - diffraction_roughness_falloff, (abs(m) - 1)), base_ior, 0);
+            refr += (intensity * Ct) * microfacet("beckmann", Nw, roughness.y * pow(1 - diffraction_roughness_falloff, (abs(m) - 1)), base_ior, 1);
+        }
+        else if(microfacet_enable){
+            float alpha_x = mix(2 * roughness.x, 0, 0.5 * (clamp(microfacet_anisotropy, epsilon - 1, 1 - epsilon) + 1));
+            float alpha_y = mix(0, 2 * roughness.x, 0.5 * (clamp(microfacet_anisotropy, epsilon - 1, 1 - epsilon) + 1));
+            metal += (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, 0, 0);
+            refl += (intensity * Ct) * microfacet("ggx", Nw, Ta, alpha_x, alpha_y, base_ior, 0);
+            refr += (intensity * Ct) * microfacet("beckmann", Nw, Ta, alpha_x, alpha_y, base_ior, 1);
+        }
     }
 
     color weighted_coat_color = mix(color(1.0), coat_color, coat_weight);
