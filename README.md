@@ -290,6 +290,12 @@ A collection of [Open Shading Language (OSL)](https://github.com/AcademySoftware
 
 - [Starfield.osl 📝](Starfield.osl)
 
+### Stones
+
+![](Stones.jpg)
+
+- [Stones.osl 📝](Stones.osl)
+
 ### Substance Flow
 
 ![](SubstanceFlow.jpg)
@@ -359,6 +365,12 @@ A collection of [Open Shading Language (OSL)](https://github.com/AcademySoftware
 ![](UberConstant.jpg)
 
 - [UberConstant.osl 📝](UberConstant.osl)
+
+### Uber Noise
+
+![](UberNoise.jpg)
+
+- [UberNoise.osl 📝](UberNoise.osl)
 
 ### Uber Scalar Math
 

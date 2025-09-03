@@ -1,0 +1,256 @@
+// UberNoise shader with many options
+// UbserNoise.osl by Zap Andersson
+// Modified: 2019-11-27
+// Copyright 2019 Autodesk Inc, All rights reserved. This file is licensed under Apache 2.0 license
+//    https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt
+
+// The Famous Worley noise, here in slightly abused form.... sorry Steven :)
+
+float WorleyNoise(point pnt, float phase, int mode, float power, float jitter, output point closestpoint)
+{     
+    float  closestdist = 1000;
+    point  cellpnt = floor(pnt+0.5);
+    vector offset  = pnt - cellpnt;
+
+    for (int x = -1; x <= 1; x++)
+    {
+        for (int y = -1; y <= 1; y++)
+        {
+            for (int z = -1; z <= 1; z++)
+            {
+                point  base    = cellpnt + vector(x,y,z);
+                float  distort = cellnoise(base, phase) - 0.5;
+
+                // Compute distance as vector
+                // and do different fun things to it 
+                // for different "modes"
+                vector dist = pnt - (base + distort * jitter); 
+                
+                float d = 0.0;
+                
+                // The default mode actually uses distance squared
+                // rather than distance, like classic Worlery. However,
+                // this actually look better - and if you really want
+                // the distance, setting the Power to 0.5 will effectively
+                // apply the square root to get the distance....
+                if (mode == 0) 
+                {
+                    // Distance squared
+                    d = dot(dist, dist);
+                }
+                // A few extra "modes" floating around the 
+                // open source community reproduced here
+                else if (mode == 1) // "Manhattan"
+                {
+                    d = abs(dist[0]) + abs(dist[1]) + abs(dist[2]);
+                }
+                else if (mode == 2) // "Chebychev"
+                {
+                    float x = abs(dist[0]);
+                    float y = abs(dist[1]);
+                    float z = abs(dist[2]);
+                    d = max(z,max(x,y));
+                }
+                else if (mode == 3)  // "Minkowski 0.5"
+                {
+                    d = sqrt(abs(dist[0])) + sqrt(abs(dist[1])) + sqrt(abs(dist[2]));
+                }
+                else if (mode == 4)  // "Minkowski 4"
+                {
+                    float x = dist[0]*dist[0];
+                    float y = dist[1]*dist[1];
+                    float z = dist[2]*dist[2];
+                    d = sqrt(x*x + y*y + z*z);
+                }
+                // (more distance metrics might be added in the future)
+                // if (mode == X) ...
+                
+
+                // Apply the power to the distance metric, to tweak it
+                d = pow(d, power);
+                
+                // Check if this was the closest one found so far...
+                if (d < closestdist) 
+                {
+                    closestpoint = base;
+                    closestdist  = d;
+                }
+            }
+        }
+    }
+
+    // Return a value, adjusted a bit to not go negative that often
+    // (it still might, but with this scaling it's rare)
+    return 1.0 - closestdist / 1.4142;
+}
+
+
+shader UberNoise (    
+    point  UVW    = transform("object", P),
+    float  Scale  = 25.0,
+    int    Type   = 0
+        [[ string widget= "mapper", 
+           int connectable = 0,
+           string options="Simplex:-1|Perlin:0|Fractal:1|Cell:2|Worley Classic (Voronoi):3|Worley Manhattan:4|Worley Chebychev:5|Worley Minkowski 0.5:6|Worley Minkowski 4:7" ]],
+    float WorleyPower      = 1.0 
+        [[ float min = 0.01, float max = 10.0]],
+    float WorleyJitter     = 1.0 
+        [[ float min = -2.0, float max = 2.0]],
+    int   Iterations = 3
+        [[ int min = 1, int max = 20 ]],
+    float Lacunarity = 1.8,
+    float Gain       = 0.77,
+    int    Mode   = 0
+        [[ string widget= "mapper", 
+           int connectable = 0,
+           string options="Add:0|Relative:1|Multiply:2" ]],
+    int   LayerDistort = 1 
+        [[ string widget= "checkBox",
+           string label = "Layer Distortion",
+           int connectable = 0]],
+    float LayerDistAmount = 4.0
+        [[ string label = "Distortion Amount" ]],
+    float LayerDistScale = 0.1
+        [[ string label = "Distortion Scale",
+           float  min = -1.0, float max = 1.0 ]],
+    float LayerDistRatio = 1.2
+        [[ string label = "Distortion Scale Ratio" ]],
+        
+    int   LayerStepFunction = 1 
+        [[ string widget= "checkBox",
+           string label = "Layer Step Function",
+           int connectable = 0 ]],
+    float LayerLowStep = 0.2
+        [[ string label = "Layer Low Step",
+           float  min = 0.0, float max = 1.0 ]],
+    float LayerHiStep = 0.8
+        [[ string label = "Layer High Step",
+           float  min = 0.0, float max = 1.0 ]],
+    int   Normalize = 1 
+        [[ string widget= "checkBox",
+           int connectable = 0 ]],
+    float Amplitude = 1.0,
+    int   OutputStepFunction = 0
+        [[ string widget= "checkBox",
+           string label = "Output Step Function",
+           int connectable = 0 ]],
+    float OutputLowStep = 0.2
+        [[ string label = "Output Low Step",
+           float  min = 0.0, float max = 1.0 ]],
+    float OutputHiStep = 0.8
+        [[ string label = "Output High Step",
+           float  min = 0.0, float max = 1.0 ]],
+    
+    color A = 0 [[ string label = "Color A" ]],
+    color B = 1 [[ string label = "Color B" ]],
+
+    float Phase     = 0.0,
+        
+    output color Color = 0,
+    output float Float = 0,
+    output color CellRandomness = 0 [[ string label = "Worley Cell Color" ]],
+    output point CellCenter = 0 [[ string label = "Worley Cell Center" ]]
+)
+{
+    point pnt = UVW / Scale;
+    
+    float sum = 0;
+    float curFreq  = 1.0;
+    float curAmp   = 1.0;
+    float curPhase = Phase;
+    
+    float curDistFreq = LayerDistScale;
+    
+    float result = 0.0, lastResult = 1.0;
+
+    point cellpoint = 0;
+    
+    if (Mode > 0)
+    {
+        sum = 1.0;
+        result = 1.0;
+    }
+        
+    // Loop over number of octaves
+    for (int i = 0; i < Iterations; i++)
+    {
+        // Compute a noise value
+        // Some random unused point
+        
+        float ns = 0.0;
+
+        point noisePoint = pnt * curFreq;
+
+
+        if (LayerDistort)
+        {
+            // Note: Distortion does not include the layer number
+            // because we do want the opportunity of each layers
+            // distortion to be similar to each other
+            point distort = noise("perlin", pnt * curDistFreq, curPhase);
+            noisePoint += distort * LayerDistAmount;
+            curDistFreq *= LayerDistRatio;
+        }
+        
+        if (Type == -1)
+            ns = noise("usimplex", noisePoint, curPhase + i);
+        else if (Type == 0)
+            ns = noise("uperlin", noisePoint, curPhase + i);
+        else if (Type == 1)
+            ns = fabs(noise("perlin", noisePoint, curPhase + i)); 
+        else if (Type == 2)
+            ns = noise("cell", noisePoint, curPhase + i);
+        else 
+            ns = WorleyNoise(noisePoint, curPhase + i, Type - 3, WorleyPower, WorleyJitter, cellpoint);
+        
+        if (LayerStepFunction)
+            ns = smoothstep(LayerLowStep, LayerHiStep, ns);
+
+        if (Mode == 0)
+        {
+            // Add our value to the result
+            result += ns * curAmp;
+            // Add the amplitude to the normalizing sum
+            sum += curAmp;
+        }
+        else if (Mode == 1)
+        {
+            // Add our value to the result weighted by last layers result
+            result += ns * curAmp * lastResult;
+            // Add the amplitude to the normalizing sum
+            sum += curAmp;
+        }
+        else if (Mode == 2)
+        {
+            // Multiply result with this layers result
+            result *= (ns * curAmp);
+            // Make the sum the product instead
+            sum *= (curAmp);
+        }
+    
+        // Remember last iteration result
+        lastResult = ns;
+
+        // Step up frequency and amplitude
+        curFreq *= Lacunarity;
+        curAmp  *= Gain;
+        
+        if (i == 0)
+        {
+            CellCenter = cellpoint;
+        }
+    }
+    
+    if (Normalize)
+        result /= sum / Amplitude;
+    else
+        result *= Amplitude;
+
+    if (OutputStepFunction)
+        result = smoothstep(OutputLowStep, OutputHiStep, result);
+
+    // Output All The Things
+    Float = result;
+    Color = mix(A, B, result);
+    CellRandomness = noise(CellCenter);
+}

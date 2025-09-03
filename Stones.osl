@@ -1,0 +1,98 @@
+// Simple stone tile node by Benjamin Mikhaiel
+// This file is licensed under Apache 2.0 license
+
+
+float frac(float x)
+{
+    return x - floor(x);
+}
+
+float colorBurn(float base, float blend)
+{
+    float burn = 1-((1-base)/blend);
+    return clamp(burn, 0, 1);
+}
+
+shader stones (
+    float tileX = 10,
+    float tileY = 5,
+    float rowOffset = 3,
+    float heightMin = 0.3,
+    float heightMax = 2,
+    float detailScale = 20,
+
+    float gapWidth = 0.3,
+
+    color colorBrickA = color(0.4,0.2,0.03),
+    color colorBrickB = color(0.58, 0.42, 0.34),
+    color colorLines = color(0.86, 0.88, 0.95),
+    color colorChips = color(0.72, 0.58, 0.41),
+    color grout = color(0.69, 0.64, 0.52),
+    color colorBrickTop = color(0.69, 0.64, 0.52),
+
+    float roughBrick = 0.5,
+    float roughGrout = 0.7,
+
+    output color outColor = 0,
+    output float roughness = 0,
+    output float height = 1,
+    output float debugOut = 0
+)
+{
+    vector pUV = vector(u, v, 0) * detailScale;
+
+    float WidthScale = tileX/tileY;
+    float Ywidth = gapWidth / WidthScale;
+
+    float shift = (ceil(u * tileX)/tileX)*rowOffset;
+    float x = frac(u * tileX);
+    float y = frac((v + shift) * tileY);
+
+    float heightVary = noise("cell", vector(ceil(u * tileX), ceil((v + shift) * tileY), 0));
+
+    float square = smoothstep(0.01, gapWidth, x) * (1-smoothstep(1-gapWidth, 0.99, x)) *
+                smoothstep(0.01, Ywidth, y) * (1-smoothstep(1-Ywidth, 0.99, y));
+
+    float top = (1-smoothstep(0.7, 0.99, x)) * smoothstep(0.01, 0.2, y) * (1-smoothstep(0.8, 0.99, y));
+    top *= (1-square);
+
+    float edgeNoise = (noise("perlin", pUV + heightVary) / 2) + 1;
+
+    float surfaceNoise = (noise("perlin", (pUV+ shift)*0.5) / 2);
+
+    float groutNoise = (noise("perlin", pUV*20) / 20);
+
+    float sqheight = colorBurn(square,  edgeNoise);
+    sqheight += edgeNoise - 0.8;
+    sqheight = clamp(sqheight, -1, 1);
+    sqheight = smoothstep(0, 1, sqheight);
+
+    height = sqheight;
+    height *= mix(heightMin, heightMax, heightVary);
+
+    height += surfaceNoise * height;
+    height += groutNoise * (1-height);
+
+    float linesHeight = noise("perlin", vector((edgeNoise * 0.01 + u)*500, v*5, 0))*0.02;;
+    height += linesHeight;
+    
+
+    float chips = noise("usimplex", vector(u, v, 0)*60) * edgeNoise;
+    chips = pow(chips, 10);
+    chips = clamp(chips, 0, 1);
+    height = height - (chips*0.1);
+
+
+    //color
+    color brickColor = mix(colorBrickA, colorBrickB, clamp(edgeNoise, 0, 1));
+    brickColor = mix(brickColor, colorBrickTop, top);
+    brickColor = mix(brickColor, colorLines, linesHeight * 5);
+    brickColor = mix(brickColor, colorChips, chips);
+    float maskClamp = clamp(sqheight * 3, 0, 1);
+    outColor = mix(grout, brickColor, maskClamp);
+
+    //roughness
+    roughness = mix(roughGrout, roughBrick, maskClamp);
+
+    debugOut = Dx(height);
+}
