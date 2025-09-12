@@ -158,6 +158,12 @@ A collection of [Open Shading Language (OSL)](https://github.com/AcademySoftware
 
 - [Jitter.osl 📝](Jitter.osl)
 
+### Kuwahara Filter
+
+![](KuwaharaFilter.png)
+
+- [KuwaharaFilter.osl 📝](KuwaharaFilter.osl)
+
 ### Lift Gamma Gain
 
 ![](LiftGammaGain.jpg)
