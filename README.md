@@ -172,7 +172,7 @@ A collection of [Open Shading Language (OSL)](https://github.com/AcademySoftware
 
 ### Luma
 
-- [Luma_Shader.osl 📝](Luma_Shader.osl)
+- [Luma.osl 📝](Luma.osl)
 
 ### Marble Shader
 
